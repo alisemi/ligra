@@ -20,6 +20,8 @@
 
 #define WEIGHTED 1
 #include "ligra.h"
+#include "Profiling.h"
+
 //uncomment the following line to compute the sum of squared errors per iteration
 //#define COMPUTE_ERROR 1
 //uncomment the following line to print out the sum of values in latent vector
@@ -81,6 +83,10 @@ struct CF_Vertex_F {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+
   int K = P.getOptionIntValue("-K",20); //dimensions of the latent vector  
   int numIter = P.getOptionIntValue("-numiter",5); //number of iterations
   double step = P.getOptionDoubleValue("-step",0.00000035); //step size
@@ -120,22 +126,30 @@ void Compute(graph<vertex>& GA, commandLine P) {
   bool* frontier = newA(bool,n);
   {parallel_for(long i=0;i<n;i++) frontier[i] = 1;}
   vertexSubset Frontier(n,n,frontier);
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_CF_" + inputFileName + "_" + result_filename;
 
-  for (int iter = 0; iter < numIter; iter++){
-    //edgemap to accumulate error for each node
-    edgeMap(GA, Frontier, CF_Edge_F<vertex>(GA.V,latent_curr,error,K), 0, no_output);
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+    for (int iter = 0; iter < numIter; iter++){
+      //edgemap to accumulate error for each node
+      edgeMap(GA, Frontier, CF_Edge_F<vertex>(GA.V,latent_curr,error,K), 0, no_output);
 
 #ifdef COMPUTE_ERROR
-    cout << "sum of squared error: " << sequence::plusReduce(squaredErrors,n)/2 << " for iter: " << iter << endl;
+      cout << "sum of squared error: " << sequence::plusReduce(squaredErrors,n)/2 << " for iter: " << iter << endl;
 #endif
 
-    //vertexmap to update the latent vectors
-    vertexMap(Frontier,CF_Vertex_F(step,lambda,latent_curr,error,K));
+      //vertexmap to update the latent vectors
+      vertexMap(Frontier,CF_Vertex_F(step,lambda,latent_curr,error,K));
 
 #ifdef DEBUG
-    cout << "latent sum: " << sequence::plusReduce(latent_curr,K*n) << endl;
+      cout << "latent sum: " << sequence::plusReduce(latent_curr,K*n) << endl;
 #endif
-  }
+    }
+  });
+  
   Frontier.del(); free(latent_curr); free(error);
 #ifdef COMPUTE_ERROR
   free(squaredErrors);

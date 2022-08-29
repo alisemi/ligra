@@ -22,6 +22,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ligra.h"
+#include "Profiling.h"
 
 struct BFS_F {
   uintE* Parents;
@@ -40,17 +41,32 @@ struct BFS_F {
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
   long start = P.getOptionLongValue("-r",0);
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+  
   long n = GA.n;
   //creates Parents array, initialized to all -1, except for start
   uintE* Parents = newA(uintE,n);
   parallel_for(long i=0;i<n;i++) Parents[i] = UINT_E_MAX;
   Parents[start] = start;
-  vertexSubset Frontier(n,start); //creates initial frontier
-  while(!Frontier.isEmpty()){ //loop until frontier is empty
-    vertexSubset output = edgeMap(GA, Frontier, BFS_F(Parents));    
-    Frontier.del();
-    Frontier = output; //set new frontier
-  } 
+  vertexSubset Frontier(n,start); //creates initial frontierS
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_BFS_" + inputFileName + "_" + result_filename;
+  
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+      while(!Frontier.isEmpty()){ //loop until frontier is empty
+        vertexSubset output = edgeMap(GA, Frontier, BFS_F(Parents));
+        Frontier.del();
+        Frontier = output; //set new frontier
+      }
+  });
+  
+  
+   
   Frontier.del();
   free(Parents); 
 }

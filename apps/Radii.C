@@ -22,6 +22,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ligra.h"
+#include "Profiling.h"
 
 //atomically do bitwise-OR of *a with b and store in location a
 template <class ET>
@@ -71,6 +72,10 @@ struct Radii_Vertex_F {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+
   long n = GA.n;
   intE* radii = newA(intE,n);
   long* Visited = newA(long,n), *NextVisited = newA(long,n);
@@ -89,14 +94,23 @@ void Compute(graph<vertex>& GA, commandLine P) {
     }}
 
   vertexSubset Frontier(n,sampleSize,starts); //initial frontier of size 64
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_Radii_" + inputFileName + "_" + result_filename;
 
   intE round = 0;
-  while(!Frontier.isEmpty()){
-    round++;
-    vertexMap(Frontier, Radii_Vertex_F(Visited,NextVisited));
-    vertexSubset output = edgeMap(GA,Frontier,Radii_F(Visited,NextVisited,radii,round));
-    Frontier.del();
-    Frontier = output;
-  }
+  
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+    while(!Frontier.isEmpty()){
+      round++;
+      vertexMap(Frontier, Radii_Vertex_F(Visited,NextVisited));
+      vertexSubset output = edgeMap(GA,Frontier,Radii_F(Visited,NextVisited,radii,round));
+      Frontier.del();
+      Frontier = output;
+    }
+  });
+  
   free(Visited); free(NextVisited); Frontier.del(); free(radii); 
 }

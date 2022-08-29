@@ -22,6 +22,7 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ligra.h"
+#include "Profiling.h"
 
 struct CC_F {
   uintE* IDs, *prevIDs;
@@ -51,6 +52,10 @@ struct CC_Vertex_F {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+
   long n = GA.n;
   uintE* IDs = newA(uintE,n), *prevIDs = newA(uintE,n);
   {parallel_for(long i=0;i<n;i++) IDs[i] = i;} //initialize unique IDs
@@ -58,12 +63,20 @@ void Compute(graph<vertex>& GA, commandLine P) {
   bool* frontier = newA(bool,n);
   {parallel_for(long i=0;i<n;i++) frontier[i] = 1;} 
   vertexSubset Frontier(n,n,frontier); //initial frontier contains all vertices
-
-  while(!Frontier.isEmpty()){ //iterate until IDS converge
-    vertexMap(Frontier,CC_Vertex_F(IDs,prevIDs));
-    vertexSubset output = edgeMap(GA, Frontier, CC_F(IDs,prevIDs));
-    Frontier.del();
-    Frontier = output;
-  }
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_Components_" + inputFileName + "_" + result_filename;
+  
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+    while(!Frontier.isEmpty()){ //iterate until IDS converge
+      vertexMap(Frontier,CC_Vertex_F(IDs,prevIDs));
+      vertexSubset output = edgeMap(GA, Frontier, CC_F(IDs,prevIDs));
+      Frontier.del();
+      Frontier = output;
+    }
+  });
+  
   Frontier.del(); free(IDs); free(prevIDs);
 }

@@ -23,6 +23,7 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ligra.h"
 #include "math.h"
+#include "Profiling.h"
 
 template <class vertex>
 struct PR_F {
@@ -68,6 +69,10 @@ struct PR_Vertex_Reset {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+
   long maxIters = P.getOptionLongValue("-maxiters",100);
   const intE n = GA.n;
   const double damping = 0.85, epsilon = 0.0000001;
@@ -83,18 +88,28 @@ void Compute(graph<vertex>& GA, commandLine P) {
   vertexSubset Frontier(n,n,frontier);
   
   long iter = 0;
-  while(iter++ < maxIters) {
-    edgeMap(GA,Frontier,PR_F<vertex>(p_curr,p_next,GA.V),0, no_output);
-    vertexMap(Frontier,PR_Vertex_F(p_curr,p_next,damping,n));
-    //compute L1-norm between p_curr and p_next
-    {parallel_for(long i=0;i<n;i++) {
-      p_curr[i] = fabs(p_curr[i]-p_next[i]);
-      }}
-    double L1_norm = sequence::plusReduce(p_curr,n);
-    if(L1_norm < epsilon) break;
-    //reset p_curr
-    vertexMap(Frontier,PR_Vertex_Reset(p_curr));
-    swap(p_curr,p_next);
-  }
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_PageRank_" + inputFileName + "_" + result_filename;
+  
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+    while(iter++ < maxIters) {
+      edgeMap(GA,Frontier,PR_F<vertex>(p_curr,p_next,GA.V),0, no_output);
+      vertexMap(Frontier,PR_Vertex_F(p_curr,p_next,damping,n));
+      //compute L1-norm between p_curr and p_next
+      {parallel_for(long i=0;i<n;i++) {
+        p_curr[i] = fabs(p_curr[i]-p_next[i]);
+        }}
+      double L1_norm = sequence::plusReduce(p_curr,n);
+      if(L1_norm < epsilon) break;
+      //reset p_curr
+      vertexMap(Frontier,PR_Vertex_Reset(p_curr));
+      swap(p_curr,p_next);
+    }
+  });
+  
+  
   Frontier.del(); free(p_curr); free(p_next); 
 }

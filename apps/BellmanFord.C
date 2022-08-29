@@ -23,6 +23,7 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define WEIGHTED 1
 #include "ligra.h"
+#include "Profiling.h"
 
 struct BF_F {
   intE* ShortestPathLen;
@@ -57,6 +58,10 @@ struct BF_Vertex_F {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+
   long start = P.getOptionLongValue("-r",0);
   long n = GA.n;
   //initialize ShortestPathLen to "infinity"
@@ -70,18 +75,27 @@ void Compute(graph<vertex>& GA, commandLine P) {
   vertexSubset Frontier(n,start); //initial frontier
 
   long round = 0;
-  while(!Frontier.isEmpty()){
-    if(round == n) {
-      //negative weight cycle
-      {parallel_for(long i=0;i<n;i++) ShortestPathLen[i] = -(INT_E_MAX/2);}
-      break;
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_BellmanFord_" + inputFileName + "_" + result_filename;
+  
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+    while(!Frontier.isEmpty()){
+      if(round == n) {
+        //negative weight cycle
+        {parallel_for(long i=0;i<n;i++) ShortestPathLen[i] = -(INT_E_MAX/2);}
+        break;
+      }
+      vertexSubset output = edgeMap(GA, Frontier, BF_F(ShortestPathLen,Visited), GA.m/20, dense_forward);
+      vertexMap(output,BF_Vertex_F(Visited));
+      Frontier.del();
+      Frontier = output;
+      round++;
     }
-    vertexSubset output = edgeMap(GA, Frontier, BF_F(ShortestPathLen,Visited), GA.m/20, dense_forward);
-    vertexMap(output,BF_Vertex_F(Visited));
-    Frontier.del();
-    Frontier = output;
-    round++;
-  }
+  });
+  
   Frontier.del(); free(Visited);
   free(ShortestPathLen);
 }

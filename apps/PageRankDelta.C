@@ -23,6 +23,7 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ligra.h"
 #include "math.h"
+#include "Profiling.h"
 
 template <class vertex>
 struct PR_F {
@@ -86,6 +87,10 @@ struct PR_Vertex_Reset {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
+  string events = P.getOptionValue("-e","cycles:u");
+  pair<char*,char*> filePairs = P.IOFileNames();
+  string inputFileName = filesystem::path( filePairs.second  ).filename();
+
   long maxIters = P.getOptionLongValue("-maxiters",100);
   const long n = GA.n;
   const double damping = 0.85;
@@ -109,21 +114,30 @@ void Compute(graph<vertex>& GA, commandLine P) {
   vertexSubset All(n,n,all); //all vertices
 
   long round = 0;
-  while(round++ < maxIters) {
-    edgeMap(GA,Frontier,PR_F<vertex>(GA.V,Delta,nghSum),GA.m/20, no_output | dense_forward);
-    vertexSubset active 
-      = (round == 1) ? 
-      vertexFilter(All,PR_Vertex_F_FirstRound(p,Delta,nghSum,damping,one_over_n,epsilon2)) :
-      vertexFilter(All,PR_Vertex_F(p,Delta,nghSum,damping,epsilon2));
-    //compute L1-norm (use nghSum as temp array)
-    {parallel_for(long i=0;i<n;i++) {
-      nghSum[i] = fabs(Delta[i]); }}
-    double L1_norm = sequence::plusReduce(nghSum,n);
-    if(L1_norm < epsilon) break;
-    //reset
-    vertexMap(All,PR_Vertex_Reset(nghSum));
-    Frontier.del();
-    Frontier = active;
-  }
+  
+  std::string result_filename = events;
+  replace(result_filename.begin(), result_filename.end(), ',', '-');
+  result_filename = "result_PageRankDelta_" + inputFileName + "_" + result_filename;
+  
+  //Wrapping around profiling
+  System::profile(result_filename, events, [&]() {
+    while(round++ < maxIters) {
+      edgeMap(GA,Frontier,PR_F<vertex>(GA.V,Delta,nghSum),GA.m/20, no_output | dense_forward);
+      vertexSubset active 
+        = (round == 1) ? 
+        vertexFilter(All,PR_Vertex_F_FirstRound(p,Delta,nghSum,damping,one_over_n,epsilon2)) :
+        vertexFilter(All,PR_Vertex_F(p,Delta,nghSum,damping,epsilon2));
+      //compute L1-norm (use nghSum as temp array)
+      {parallel_for(long i=0;i<n;i++) {
+        nghSum[i] = fabs(Delta[i]); }}
+      double L1_norm = sequence::plusReduce(nghSum,n);
+      if(L1_norm < epsilon) break;
+      //reset
+      vertexMap(All,PR_Vertex_Reset(nghSum));
+      Frontier.del();
+      Frontier = active;
+    }
+  });
+  
   Frontier.del(); free(p); free(Delta); free(nghSum); All.del();
 }

@@ -27,6 +27,7 @@
 // Components", WSDM 2018.
 #include "ligra.h"
 
+
 struct CC_Shortcut {
   uintE* IDs, *prevIDs;
   CC_Shortcut(uintE* _IDs, uintE* _prevIDs) :
