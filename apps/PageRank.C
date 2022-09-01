@@ -23,7 +23,7 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ligra.h"
 #include "math.h"
-#include "Profiling.h"
+#include "chp_perf.h"
 
 template <class vertex>
 struct PR_F {
@@ -69,7 +69,7 @@ struct PR_Vertex_Reset {
 
 template <class vertex>
 void Compute(graph<vertex>& GA, commandLine P) {
-  string events = P.getOptionValue("-e","cycles:u");
+  string events = P.getOptionValue("-e","0x53003c");
   pair<char*,char*> filePairs = P.IOFileNames();
   string inputFileName = filesystem::path( filePairs.second  ).filename();
 
@@ -93,22 +93,27 @@ void Compute(graph<vertex>& GA, commandLine P) {
   replace(result_filename.begin(), result_filename.end(), ',', '-');
   result_filename = "result_PageRank_" + inputFileName + "_" + result_filename;
   
-  //Wrapping around profiling
-  System::profile(result_filename, events, [&]() {
-    while(iter++ < maxIters) {
-      edgeMap(GA,Frontier,PR_F<vertex>(p_curr,p_next,GA.V),0, no_output);
-      vertexMap(Frontier,PR_Vertex_F(p_curr,p_next,damping,n));
-      //compute L1-norm between p_curr and p_next
-      {parallel_for(long i=0;i<n;i++) {
-        p_curr[i] = fabs(p_curr[i]-p_next[i]);
-        }}
-      double L1_norm = sequence::plusReduce(p_curr,n);
-      if(L1_norm < epsilon) break;
-      //reset p_curr
-      vertexMap(Frontier,PR_Vertex_Reset(p_curr));
-      swap(p_curr,p_next);
-    }
-  });
+  //std::string event_configs = "0x5301c0, 0x53003c";
+  struct perf_struct *perf = init_perf(events);
+  reset_counter(perf);
+  start_counter(perf);
+
+  while(iter++ < maxIters) {
+    edgeMap(GA,Frontier,PR_F<vertex>(p_curr,p_next,GA.V),0, no_output);
+    vertexMap(Frontier,PR_Vertex_F(p_curr,p_next,damping,n));
+    //compute L1-norm between p_curr and p_next
+    {parallel_for(long i=0;i<n;i++) {
+      p_curr[i] = fabs(p_curr[i]-p_next[i]);
+      }}
+    double L1_norm = sequence::plusReduce(p_curr,n);
+    if(L1_norm < epsilon) break;
+    //reset p_curr
+    vertexMap(Frontier,PR_Vertex_Reset(p_curr));
+    swap(p_curr,p_next);
+  }
+
+  stop_counter(perf);
+  read_counter(perf, NULL, result_filename);
   
   
   Frontier.del(); free(p_curr); free(p_next); 
