@@ -1,5 +1,5 @@
 // This code is part of the project "Ligra: A Lightweight Graph Processing
-// Framework for Shared Memory", presented at Principles and Practice of 
+// Framework for Shared Memory", presented at Principles and Practice of
 // Parallel Programming, 2013.
 // Copyright (c) 2013 Julian Shun and Guy Blelloch
 //
@@ -34,14 +34,18 @@
 #include <sstream>
 #include <iostream>
 #include <cstdlib>
-static int getWorkers() {
+static int getWorkers()
+{
   return __cilkrts_get_nworkers();
 }
-static void setWorkers(int n) {
+static void setWorkers(int n)
+{
   __cilkrts_end_cilk();
   //__cilkrts_init();
-  std::stringstream ss; ss << n;
-  if (0 != __cilkrts_set_param("nworkers", ss.str().c_str())) {
+  std::stringstream ss;
+  ss << n;
+  if (0 != __cilkrts_set_param("nworkers", ss.str().c_str()))
+  {
     std::cerr << "failed to set worker count!" << std::endl;
     std::abort();
   }
@@ -58,14 +62,18 @@ static void setWorkers(int n) {
 #include <sstream>
 #include <iostream>
 #include <cstdlib>
-static int getWorkers() {
+static int getWorkers()
+{
   return __cilkrts_get_nworkers();
 }
-static void setWorkers(int n) {
+static void setWorkers(int n)
+{
   __cilkrts_end_cilk();
   //__cilkrts_init();
-  std::stringstream ss; ss << n;
-  if (0 != __cilkrts_set_param("nworkers", ss.str().c_str())) {
+  std::stringstream ss;
+  ss << n;
+  if (0 != __cilkrts_set_param("nworkers", ss.str().c_str()))
+  {
     std::cerr << "failed to set worker count!" << std::endl;
     std::abort();
   }
@@ -80,6 +88,66 @@ static void setWorkers(int n) {
 #define parallel_for _Pragma("omp parallel for") for
 #define parallel_for_1 _Pragma("omp parallel for schedule (static,1)") for
 #define parallel_for_256 _Pragma("omp parallel for schedule (static,256)") for
+#define parallel_for_dynamic _Pragma("omp parallel for schedule (guided,1024)") for
+
+#define unrolled_dynamic_parallel_for4(_i, _start, _end, _body) \
+  {                                                             \
+    parallel_for_dynamic(size_t _k = _start; _k < _end-3; _k += 4)   \
+      {                                                         \
+        size_t _i = _k;                                         \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+      }                                                         \
+      for(size_t _i =4*(_end/4); _i < _end; _i++){              \
+        _body;                                                  \
+      }                                                         \
+    }
+
+
+#define unrolled_parallel_for4(_i, _start, _end, _body)         \
+  {                                                             \
+    parallel_for(size_t _k = _start; _k < _end-3; _k += 4)      \
+      {                                                         \
+        size_t _i = _k;                                         \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+      }                                                         \
+      for(size_t _i =4*(_end/4); _i < _end; _i++){              \
+        _body;                                                  \
+      }                                                         \
+    }
+
+#define unrolled_for4(_i, _start, _end, _body)                  \
+  {                                                             \
+    for(size_t _k = _start; _k < _end-3; _k += 4)               \
+      {                                                         \
+        size_t _i = _k;                                         \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+        _body                                                   \
+        _i++;                                                   \
+      }                                                         \
+      for(size_t _i =4*(_end/4); _i < _end; _i++){              \
+        _body;                                                  \
+      }                                                         \
+    }                                                               
+
 static int getWorkers() { return omp_get_max_threads(); }
 static void setWorkers(int n) { omp_set_num_threads(n); }
 
@@ -93,7 +161,7 @@ static void setWorkers(int n) { omp_set_num_threads(n); }
 #define parallel_for_256 for
 #define cilk_for for
 static int getWorkers() { return 1; }
-static void setWorkers(int n) { }
+static void setWorkers(int n) {}
 
 #endif
 
@@ -111,7 +179,7 @@ typedef unsigned int uintT;
 #define UINT_T_MAX UINT_MAX
 #endif
 
-//edges store 32-bit quantities unless EDGELONG is defined
+// edges store 32-bit quantities unless EDGELONG is defined
 #if defined(EDGELONG)
 typedef long intE;
 typedef unsigned long uintE;

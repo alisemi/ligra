@@ -91,7 +91,7 @@ void Compute(graph<vertex>& GA, commandLine P) {
   
   std::string result_filename = events;
   replace(result_filename.begin(), result_filename.end(), ',', '-');
-  result_filename = "result_PageRank_" + inputFileName + "_" + result_filename;
+  result_filename = "ligra3_loop_unroll_result_PageRank_" + inputFileName + "_" + result_filename;
   
   //std::string event_configs = "0x5301c0, 0x53003c";
   struct perf_struct *perf = init_perf(events);

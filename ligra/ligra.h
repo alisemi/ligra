@@ -63,20 +63,22 @@ vertexSubsetData<data> edgeMapDense(graph<vertex> GA, VS& vertexSubset, F &f, co
   if (should_output(fl)) {
     D* next = newA(D, n);
     auto g = get_emdense_gen<data>(next);
-    parallel_for (long v=0; v<n; v++) {
+    long v;
+    unrolled_dynamic_parallel_for4(v,0,n, {
       std::get<0>(next[v]) = 0;
       if (f.cond(v)) {
         G[v].decodeInNghBreakEarly(v, vertexSubset, f, g, fl & dense_parallel);
       }
-    }
+    });
     return vertexSubsetData<data>(n, next);
   } else {
     auto g = get_emdense_nooutput_gen<data>();
-    parallel_for (long v=0; v<n; v++) {
+    long v;
+    unrolled_dynamic_parallel_for4(v,0,n, {
       if (f.cond(v)) {
         G[v].decodeInNghBreakEarly(v, vertexSubset, f, g, fl & dense_parallel);
       }
-    }
+    });
     return vertexSubsetData<data>(n);
   }
 }
@@ -90,19 +92,21 @@ vertexSubsetData<data> edgeMapDenseForward(graph<vertex> GA, VS& vertexSubset, F
     D* next = newA(D, n);
     auto g = get_emdense_forward_gen<data>(next);
     parallel_for(long i=0;i<n;i++) { std::get<0>(next[i]) = 0; }
-    parallel_for (long i=0; i<n; i++) {
+    long i;
+    unrolled_dynamic_parallel_for4(i,0,n, {
       if (vertexSubset.isIn(i)) {
         G[i].decodeOutNgh(i, f, g);
       }
-    }
+    });
     return vertexSubsetData<data>(n, next);
   } else {
     auto g = get_emdense_forward_nooutput_gen<data>();
-    parallel_for (long i=0; i<n; i++) {
+    long i;
+    unrolled_dynamic_parallel_for4(i,0,n, {
       if (vertexSubset.isIn(i)) {
         G[i].decodeOutNgh(i, f, g);
       }
-    }
+    });
     return vertexSubsetData<data>(n);
   }
 }
@@ -120,18 +124,21 @@ vertexSubsetData<data> edgeMapSparse(graph<vertex>& GA, vertex* frontierVertices
     outEdgeCount = sequence::plusScan(offsets, offsets, m);
     outEdges = newA(S, outEdgeCount);
     auto g = get_emsparse_gen<data>(outEdges);
-    parallel_for (size_t i = 0; i < m; i++) {
-      uintT v = indices.vtx(i), o = offsets[i];
+    size_t i;
+    unrolled_dynamic_parallel_for4(i,0,m, {
+      uintT v = indices.vtx(i);
+      uintT o = offsets[i];
       vertex vert = frontierVertices[i];
       vert.decodeOutNghSparse(v, o, f, g);
-    }
+    });
   } else {
     auto g = get_emsparse_nooutput_gen<data>();
-    parallel_for (size_t i = 0; i < m; i++) {
+    size_t i;
+    unrolled_dynamic_parallel_for4(i,0,m, {
       uintT v = indices.vtx(i);
       vertex vert = frontierVertices[i];
       vert.decodeOutNghSparse(v, 0, f, g);
-    }
+    });
   }
 
   if (should_output(fl)) {

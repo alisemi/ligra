@@ -45,7 +45,7 @@ namespace decode_uncompressed {
   template <class V, class F, class G>
   inline void decodeOutNgh(V* v, long i, F &f, G &g) {
     uintE d = v->getOutDegree();
-    granular_for(j, 0, d, (d > 1000), {
+    granular_unrolled_for4(j, 0, d, (d > 1000), {
       uintE ngh = v->getOutNeighbor(j);
       if (f.cond(ngh)) {
 #ifndef WEIGHTED
@@ -63,7 +63,7 @@ namespace decode_uncompressed {
   template <class V, class F, class G>
   inline void decodeOutNghSparse(V* v, long i, uintT o, F &f, G &g) {
     uintE d = v->getOutDegree();
-    granular_for(j, 0, d, (d > 1000), {
+    granular_unrolled_for4(j, 0, d, (d > 1000), {
       uintE ngh = v->getOutNeighbor(j);
       if (f.cond(ngh)) {
 #ifndef WEIGHTED
@@ -145,7 +145,7 @@ namespace decode_uncompressed {
   template <class V, class E, class F, class G>
   inline void copyOutNgh(V* v, long src, uintT o, F& f, G& g) {
     uintE d = v->getOutDegree();
-    granular_for(j, 0, d, (d > 1000), {
+    granular_unrolled_for4(j, 0, d, (d > 1000), {
       uintE ngh = v->getOutNeighbor(j);
 #ifdef WEIGHTED
       E val = f(src, ngh, v->getOutWeight(j));
